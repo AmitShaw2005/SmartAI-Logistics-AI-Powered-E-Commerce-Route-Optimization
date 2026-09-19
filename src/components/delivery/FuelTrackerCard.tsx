@@ -1,5 +1,5 @@
 import React from 'react';
-import { Fuel, Zap, TrendingDown, DollarSign, Award, Leaf } from 'lucide-react';
+import { Fuel, Zap, TrendingDown, DollarSign, Award, Leaf, Layers, PackageCheck } from 'lucide-react';
 import { DeliveryPartner, RouteOptimizationResult } from '../../types';
 
 interface FuelTrackerCardProps {
@@ -22,6 +22,8 @@ export const FuelTrackerCard: React.FC<FuelTrackerCardProps> = ({ partner, route
 
   // CO2 reduction approx: 2.31 kg CO2 per liter petrol, or clean grid factor for EV
   const co2SavedKg = Number((fuelSaved * (isElectric ? 0.72 : 2.31)).toFixed(2));
+
+  const isMultiBatch = Boolean(route?.isMultiOrderBatch);
 
   return (
     <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
@@ -74,6 +76,69 @@ export const FuelTrackerCard: React.FC<FuelTrackerCardProps> = ({ partner, route
           </div>
         </div>
       </div>
+
+      {/* Dedicated Multi-Order Same-Path Batching Telemetry */}
+      {isMultiBatch && (
+        <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200/80 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+              <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Same-Path Co-Delivery Active</span>
+            </div>
+            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+              {route?.batchedOrdersCount || 2} Orders Bundled
+            </span>
+          </div>
+
+          <p className="text-[11px] text-emerald-800 leading-relaxed">
+            By carrying items for multiple customers on the same corridor in a single run, 
+            you eliminated separate round-trips to the dark-store.
+          </p>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-emerald-200/60">
+            <div>
+              <span className="text-emerald-700 block">Separate Trips vs Combined:</span>
+              <strong className="text-emerald-950">
+                {route?.unbatchedTotalDistanceKm || 14.8} km &rarr; {route?.totalDistanceKm} km
+              </strong>
+            </div>
+            <div>
+              <span className="text-emerald-700 block">Batch Fuel Saved:</span>
+              <strong className="text-emerald-950">
+                ~{route?.batchFuelSavedLiters || 0.38} {unit} (₹{route?.batchCostSaved || 39})
+              </strong>
+            </div>
+          </div>
+
+          {route?.capacityUtilization && (
+            <div className="pt-1">
+              {(() => {
+                const utilPct = Math.round(
+                  (route.capacityUtilization.currentOrders /
+                    Math.max(1, route.capacityUtilization.maxOrders)) *
+                    100
+                );
+                return (
+                  <>
+                    <div className="flex justify-between text-[10px] text-emerald-700 mb-1">
+                      <span>Vehicle Carrying Capacity</span>
+                      <span className="font-bold text-emerald-900">
+                        {route.capacityUtilization.currentOrders}/{route.capacityUtilization.maxOrders} orders ({utilPct}%) &bull; {route.capacityUtilization.currentWeightKg}kg / {route.capacityUtilization.maxWeightKg}kg max
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-emerald-200/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-600 rounded-full"
+                        style={{ width: `${Math.min(100, utilPct)}%` }}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Comparison Progress Bar */}
       <div className="space-y-1.5 pt-1">

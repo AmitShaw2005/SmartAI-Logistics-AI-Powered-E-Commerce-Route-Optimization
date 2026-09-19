@@ -11,6 +11,8 @@ import {
   Power,
   ChevronRight,
   ShieldCheck,
+  Leaf,
+  Layers,
 } from 'lucide-react';
 import { DeliveryPartner, Order, RouteOptimizationResult, SimulationState } from '../../types';
 import { api } from '../../services/api';
@@ -28,8 +30,10 @@ export const DeliveryDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
   const [activeOrderForConfirmation, setActiveOrderForConfirmation] = useState<Order | null>(null);
+  const [detourActive, setDetourActive] = useState<boolean>(false);
+  const [autoDetecting, setAutoDetecting] = useState<boolean>(false);
 
-  const loadPartnerData = async () => {
+  const loadPartnerData = async (forceDetour?: boolean) => {
     try {
       // Fetch current partner profile
       const fleetRes = await api.getFleet();
@@ -47,8 +51,9 @@ export const DeliveryDashboard: React.FC = () => {
       const simRes = await api.getSimulation();
       setSimulation(simRes.simulation);
 
-      // Fetch optimized route
-      const routeRes = await api.getOptimizedRoute(currentPartner.id);
+      // Fetch optimized route with detour flag
+      const useDetour = forceDetour !== undefined ? forceDetour : detourActive;
+      const routeRes = await api.getOptimizedRoute(currentPartner.id, useDetour);
       setRoute(routeRes.route);
     } catch (err) {
       console.error('Failed to load delivery data', err);
@@ -59,9 +64,9 @@ export const DeliveryDashboard: React.FC = () => {
 
   useEffect(() => {
     loadPartnerData();
-    const timer = setInterval(loadPartnerData, 8000);
+    const timer = setInterval(() => loadPartnerData(), 8000);
     return () => clearInterval(timer);
-  }, []);
+  }, [detourActive]);
 
   const handleToggleOnline = async () => {
     if (!partner) return;
@@ -86,10 +91,40 @@ export const DeliveryDashboard: React.FC = () => {
     if (!partner) return;
     setOptimizing(true);
     try {
-      const routeRes = await api.getOptimizedRoute(partner.id);
+      const routeRes = await api.getOptimizedRoute(partner.id, detourActive);
       setRoute(routeRes.route);
     } finally {
       setOptimizing(false);
+    }
+  };
+
+  const handleToggleDetour = async (apply: boolean) => {
+    setDetourActive(apply);
+    if (!partner) return;
+    setOptimizing(true);
+    try {
+      const routeRes = await api.getOptimizedRoute(partner.id, apply);
+      setRoute(routeRes.route);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const handleAutoDetectEnvironment = async () => {
+    setAutoDetecting(true);
+    try {
+      const res = await api.autoDetectEnvironment();
+      if (res.simulation) {
+        setSimulation(res.simulation);
+      }
+      if (partner) {
+        const routeRes = await api.getOptimizedRoute(partner.id, detourActive);
+        setRoute(routeRes.route);
+      }
+    } catch (err) {
+      console.error('Failed to auto-detect environment', err);
+    } finally {
+      setAutoDetecting(false);
     }
   };
 
@@ -207,8 +242,13 @@ export const DeliveryDashboard: React.FC = () => {
               markers={mapMarkers}
               polyline={route?.routePolyline || []}
               alternativePolyline={route?.alternativePolyline || []}
+              trafficSegments={route?.trafficSegments}
+              incidents={route?.incidents}
+              weatherTelemetry={route?.weatherTelemetry}
+              weatherCondition={route?.weatherTelemetry?.condition || simulation?.weather}
+              trafficCondition={route?.trafficSegments?.some(s => s.status === 'SEVERE') ? 'SEVERE' : route?.trafficSegments?.some(s => s.status === 'HIGH') ? 'HIGH' : 'MEDIUM'}
               vehicleType={partner.vehicleType === 'electric_van' ? 'electric_van' : partner.vehicleType === 'motorcycle' ? 'motorcycle' : 'electric_bike'}
-              height="380px"
+              height="390px"
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1 text-[11px] text-slate-500">
@@ -241,6 +281,28 @@ export const DeliveryDashboard: React.FC = () => {
               </span>
             </div>
 
+            {/* Same-Path Multi-Order Co-Delivery Banner */}
+            {orders.length > 1 && (
+              <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-300/60 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-lg bg-emerald-600 text-white">
+                      <Leaf className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="text-xs font-bold text-emerald-950">
+                      Multi-Order Same-Path Co-Delivery Active
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    {orders.length} Orders Bundled
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-900 leading-relaxed">
+                  Carrying orders for <strong>{orders.map(o => o.customerName).join(' & ')}</strong> along the same route corridor ({orders[0]?.coDeliveryCorridor || 'Optimized Shared Corridor'}). Carrying these simultaneously prevents extra hub round-trips and saves ~{route?.batchFuelSavedLiters || 0.38} {partner?.fuelType === 'Electric' ? 'kWh' : 'L'} fuel.
+                </p>
+              </div>
+            )}
+
             {orders.length === 0 ? (
               <div className="py-8 text-center bg-slate-50 rounded-2xl border border-slate-100">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
@@ -266,7 +328,7 @@ export const DeliveryDashboard: React.FC = () => {
                     >
                       <div className="flex flex-col sm:flex-row justify-between gap-3">
                         <div className="space-y-1.5 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
                               {matchingStop ? matchingStop.sequenceNumber : idx + 1}
                             </span>
@@ -282,6 +344,14 @@ export const DeliveryDashboard: React.FC = () => {
                             >
                               {ord.priority}
                             </span>
+
+                            {ord.isBatched && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                <Leaf className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Co-Delivery Corridor Stop</span>
+                              </span>
+                            )}
+
                             <span className="text-xs font-semibold text-blue-600 ml-auto sm:ml-0">
                               Status: {ord.status.replace(/_/g, ' ')}
                             </span>
@@ -299,6 +369,12 @@ export const DeliveryDashboard: React.FC = () => {
                           <div className="text-[11px] text-slate-600">
                             📦 Items: {ord.items.map(i => `${i.quantity}x ${i.productName}`).join(', ')}
                           </div>
+
+                          {ord.isBatched && ord.batchedWithOrderIds && ord.batchedWithOrderIds.length > 0 && (
+                            <div className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg inline-block">
+                              🌿 Bundled along corridor with #{ord.batchedWithOrderIds.join(', #')} (Saves ~{ord.batchFuelSavingsLiters || 0.38}L fuel)
+                            </div>
+                          )}
                         </div>
 
                         {/* Order Handover State Actions */}
@@ -356,6 +432,10 @@ export const DeliveryDashboard: React.FC = () => {
             simulation={simulation}
             onReoptimize={handleReoptimize}
             loading={optimizing}
+            onToggleDetour={handleToggleDetour}
+            detourActive={detourActive}
+            onAutoDetectEnv={handleAutoDetectEnvironment}
+            autoDetecting={autoDetecting}
           />
 
           <FuelTrackerCard

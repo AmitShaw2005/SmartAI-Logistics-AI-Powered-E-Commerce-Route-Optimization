@@ -37,30 +37,49 @@ export async function generateAILogisticsInsight(
   }
 
   try {
+    const weatherTele = route.weatherTelemetry;
+    const incidentsList = route.incidents?.map(inc => `* [${inc.severity}] ${inc.title}: ${inc.description} (+${inc.delayImpactMinutes}m delay)`).join('\n') || 'None detected.';
+    const perishableOrders = orders.filter(o => o.items.some(i => i.productName.toLowerCase().includes('milk') || i.productName.toLowerCase().includes('mango') || i.productName.toLowerCase().includes('curd') || i.productName.toLowerCase().includes('butter')));
+
     const prompt = `
 You are the SmartAI Logistics Dispatch & Route Intelligence Engine.
-Analyze the following active delivery batch and provide a concise, high-impact route optimization insight and safety recommendations for delivery partner ${partner.name}.
+Analyze the active delivery batch and environmental conditions to provide high-impact route optimization insights, traffic bottleneck advisories, and weather safety recommendations for courier ${partner.name}.
 
-Delivery Partner Details:
+Courier Details:
 - Vehicle: ${partner.vehicleType} (${partner.fuelType}, efficiency ${partner.vehicleEfficiency})
-- Assigned Deliveries: ${orders.length}
-- Total Optimized Distance: ${route.totalDistanceKm} km (Baseline was ${route.baselineDistanceKm} km)
-- Estimated Duration: ${route.totalDurationMinutes} minutes
-- Estimated Fuel Saved: ${route.fuelSavedLiters} ${partner.fuelType === 'Electric' ? 'kWh' : 'liters'}
-- Simulated Traffic: ${simulation.traffic}
-- Simulated Weather: ${simulation.weather}
+- Active Stops: ${orders.length} orders
+- Multi-Order Co-Delivery Batch: ${route.isMultiOrderBatch ? `YES (${route.bundledCustomers?.join(' & ')} bundled along ${route.coDeliveryCorridor}; saves ~${route.batchFuelSavedLiters} ${partner.fuelType === 'Electric' ? 'kWh' : 'L'} fuel / ₹${route.batchCostSaved})` : 'Single order'}
+- Optimized Distance: ${route.totalDistanceKm} km (Baseline was ${route.baselineDistanceKm} km)
+- Estimated Transit Time: ${route.totalDurationMinutes} mins
+- Fuel/Energy Saved: ${route.fuelSavedLiters} ${partner.fuelType === 'Electric' ? 'kWh' : 'liters'}
 
-Stops Sequence:
+Environmental & Weather Telemetry:
+- Weather Condition: ${simulation.weather}
+- Ambient Temperature: ${weatherTele?.temperatureC ?? 28}°C | Precipitation Risk: ${weatherTele?.precipitationChance ?? 0}%
+- Road Friction Index: ${weatherTele?.roadFrictionIndex ?? 0.95} (1.0 = dry asphalt, <0.6 = slippery wet asphalt)
+- Braking Distance Penalty: +${weatherTele?.brakingDistancePenaltyPercent ?? 0}%
+- Perishable/Temperature-Sensitive Orders: ${perishableOrders.length > 0 ? perishableOrders.map(o => o.id).join(', ') : 'None'}
+
+Traffic & Identified Bottlenecks:
+- Traffic Level: ${simulation.traffic}
+- Identified Incidents along corridor:
+${incidentsList}
+- Smart Detour Available: ${route.smartDetourAvailable ? 'YES (Saves ~' + route.smartDetourSavingsMinutes + ' mins by bypassing 100ft road)' : 'NO'}
+
+Delivery Stops Sequence:
 ${route.stops
   .map(
     s =>
-      `- Stop ${s.sequenceNumber}: Order #${s.orderId} (${s.priority} priority) - ${s.itemsSummary} -> ETA ${s.estimatedArrival}`
+      `- Stop #${s.sequenceNumber}: Order #${s.orderId} (${s.priority} priority) - ${s.itemsSummary} -> ETA ${s.estimatedArrival}`
   )
   .join('\n')}
 
-Respond in clean JSON with two fields:
-1. "explanation": A clear 2-3 sentence logistics explanation of why this sequence is optimal (e.g. priority deadlines, traffic bypass, and distance economy).
-2. "recommendations": Array of 3 tactical tips for the driver (e.g. speed, fuel savings, traffic caution).
+Respond in valid JSON with:
+1. "explanation": A clear 2-3 sentence logistics explanation addressing why this sequence was selected, how current traffic bottlenecks were handled (or bypassed), and how the weather condition affects courier dispatch.
+2. "recommendations": Array of 3-4 tactical tips for the driver covering:
+   - Traffic guidance & detour advice
+   - Weather & road friction safety (braking, visibility)
+   - Order temperature/moisture preservation (waterproofing/cold packs)
 `;
 
     const response = await client.models.generateContent({

@@ -7,6 +7,7 @@ import {
   AnalyticsSummary,
   User,
   UserRole,
+  BatchDispatchSummary,
 } from '../types';
 
 class ApiClient {
@@ -156,6 +157,19 @@ class ApiClient {
     });
   }
 
+  async batchAssignOrders(orderIds: string[], partnerId: string): Promise<{ success: boolean; message: string; orders: Order[] }> {
+    return this.request<{ success: boolean; message: string; orders: Order[] }>('/api/orders/batch-assign', {
+      method: 'POST',
+      body: JSON.stringify({ orderIds, partnerId }),
+    });
+  }
+
+  async autoBatchOrders(): Promise<BatchDispatchSummary> {
+    return this.request<BatchDispatchSummary>('/api/orders/auto-batch', {
+      method: 'POST',
+    });
+  }
+
   async confirmDelivery(
     orderId: string,
     payload: { otp?: string; note?: string; photoUrl?: string }
@@ -189,8 +203,21 @@ class ApiClient {
     });
   }
 
-  async getOptimizedRoute(partnerId: string): Promise<{ route: RouteOptimizationResult }> {
-    return this.request<{ route: RouteOptimizationResult }>(`/api/delivery/optimize-route/${partnerId}`);
+  async getOptimizedRoute(partnerId: string, applyDetour: boolean = false): Promise<{ route: RouteOptimizationResult }> {
+    const query = applyDetour ? '?applyDetour=true' : '';
+    return this.request<{ route: RouteOptimizationResult }>(`/api/delivery/optimize-route/${partnerId}${query}`);
+  }
+
+  async autoDetectEnvironment(): Promise<{
+    success: boolean;
+    timeContext: string;
+    weather: any;
+    traffic: any;
+    telemetry: any;
+    incidents: any[];
+    simulation: SimulationState;
+  }> {
+    return this.request('/api/simulation/auto-detect', { method: 'POST' });
   }
 
   // Simulation & Fleet

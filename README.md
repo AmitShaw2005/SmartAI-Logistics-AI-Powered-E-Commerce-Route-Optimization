@@ -16,8 +16,8 @@ SmartAI Logistics is a modern full-stack application connecting customers, produ
 - **Digital Tax Invoice**: Generates compliant GST tax invoices with itemized rates, taxes, customer details, and print/PDF support.
 
 ### 2. 🗺️ Dual Map Engine & Real-Time Vehicle Tracking
-- **Google Maps Platform Integration**: Built using the modern `@vis.gl/react-google-maps` SDK with `AdvancedMarkerElement`, vector styling, and roadmap/satellite/terrain options.
-- **Leaflet / OpenStreetMap Fallback**: Seamless one-click toggle between Google Maps and OpenStreetMap.
+- **Google Maps Platform Integration**: Built using the modern `@vis.gl/react-google-maps` SDK with `AdvancedMarkerElement`, vector styling, native `google.maps.TrafficLayer`, and roadmap/satellite/terrain options.
+- **Leaflet / OpenStreetMap Fallback**: Seamless one-click toggle between Google Maps and OpenStreetMap with full feature parity.
 - **Live Moving Vehicle Simulation**:
   - Continuous waypoint interpolation along route polylines.
   - Automatic compass bearing calculation for realistic vehicle heading rotation.
@@ -25,29 +25,52 @@ SmartAI Logistics is a modern full-stack application connecting customers, produ
   - Selectable vehicle models: **Scooter (🛵)**, **Motorbike (🏍️)**, **Car (🚗)**, and **Electric Van (🚐)**.
   - Playback controls: Pause/Resume, Reset, Speed Multipliers (**1x, 2x, 5x, 10x**), and Auto-Follow Camera mode.
 
-### 3. 🤖 Gemini AI Dispatch Reasoning Engine
+### 3. 🧠 Smart Traffic & Environmental Physics Engine
+- **Corridor Traffic Classification**:
+  - Automatically segments polylines into color-coded traffic zones:
+    - 🟢 **Emerald**: Free Flow (35-45 km/h)
+    - 🟡 **Amber**: Moderate Congestion (22-28 km/h)
+    - 🟠 **Orange-Red**: Heavy Traffic (12-18 km/h)
+    - 🔴 **Dark Crimson**: Severe Gridlock (5-8 km/h)
+- **Active Traffic Incidents & Bottlenecks**:
+  - Visual interactive incident pins along the corridor (e.g., *Waterlogged Underpass*, *Metro Construction Blockade*, *Broken Down Bus*).
+  - Calculates specific minute delay impacts and pinpoints whether a detour is recommended.
+- **Dynamic Speed Throttling (`calculateDynamicSpeed`)**:
+  - Vehicle transit speed realistically decelerates in real time as the vehicle enters rain, fog, high traffic corridors, or bottlenecks.
+  - Top-left telemetry HUD displays live throttled speed and current corridor condition.
+- **Environmental Physics & Weather Telemetry**:
+  - **Road Friction Index** (e.g., 0.65 in heavy rain, 0.45 in thunderstorms).
+  - **Braking Distance Multiplier** (+20% to +45% in wet conditions).
+  - **Atmospheric Visibility** (km) & ambient temperature tracking.
+- **AI Smart Detour Routing**:
+  - Automatically pre-computes an elevated bypass route avoiding waterlogging and gridlocked arterial roads.
+  - Delivery partners can review the AI recommendation and toggle **"Apply AI Detour"** to instantly update routing coordinates and map paths.
+- **Auto-Detect Environmental Intelligence**:
+  - Built-in `/api/simulation/auto-detect` endpoint detects circadian peak hours (morning/evening rush hour) and environmental weather hazards to dynamically recalibrate the simulation.
+
+### 4. 🤖 Gemini AI Dispatch Reasoning Engine
 - Uses the modern `@google/genai` TypeScript SDK (Gemini 3.8 Flash).
 - Explains why a delivery sequence was selected, highlighting priority deadlines, road congestion bottlenecks, and weather risks.
 - Provides actionable driver recommendations and safety checklists.
 
-### 4. 🛣️ Intelligent Route Optimization
+### 5. 🛣️ Intelligent Route Optimization
 - Integrates Open Source Routing Machine (OSRM) with geometric fallback algorithms.
 - Implements Traveling Salesperson Problem (TSP) heuristics to sequence multi-stop deliveries based on distance, priority (Normal vs 15-min Express), and time windows.
 - Compares optimized paths against unoptimized baseline (FIFO) routes.
 
-### 5. ⚡ Live Environmental & Traffic Simulation Tuner
+### 6. ⚡ Live Environmental & Traffic Simulation Tuner
 - Real-time adjustments to traffic density: **LOW**, **MEDIUM**, **HIGH**, and **SEVERE** (triggering dynamic delay multipliers).
-- Dynamic weather conditions: **CLEAR**, **CLOUDY**, **RAIN**, and **FOG** with realistic travel hazard adjustments.
-- Instant recalculation of ETAs and route polylines.
+- Dynamic weather conditions: **CLEAR**, **CLOUDY**, **RAIN**, **THUNDERSTORM**, and **FOG** with realistic travel hazard adjustments.
+- Instant recalculation of ETAs, route polylines, and fuel telemetry.
 
-### 6. ⛽ Fuel & Eco Efficiency Telemetry
+### 7. ⛽ Fuel & Eco Efficiency Telemetry
 - Monitors fuel consumption (L/100km) for internal combustion engines and energy usage (kWh/100km) for electric vehicles.
 - Computes money saved based on configurable fuel prices (₹/L or $/gal).
 - Estimates CO₂ emissions offset by route optimization and green EV fleets.
 
-### 7. 👥 Role-Based Portals
-- **Customer Portal**: Browse catalog, order items, track live courier movement on the map, and view past orders & receipts.
-- **Delivery Partner Portal**: View assigned delivery stops, toggle online/offline availability, monitor fuel savings, inspect AI route reasoning, and verify deliveries using OTP codes.
+### 8. 👥 Role-Based Portals
+- **Customer Portal**: Browse catalog, order items, track live courier movement with traffic segments & incidents on the map, and view past orders & receipts.
+- **Delivery Partner Portal**: View assigned delivery stops, toggle online/offline availability, monitor fuel savings, inspect AI route reasoning, apply smart detours, and verify deliveries using OTP codes.
 - **Operations Admin Portal**: High-level operational KPIs (gross revenue, average delivery time, active fleet, CO₂ offset), order management, product stock catalog, and fleet telemetry.
 
 ---

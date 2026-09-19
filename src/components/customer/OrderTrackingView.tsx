@@ -10,8 +10,10 @@ import {
   ArrowLeft,
   KeyRound,
   RefreshCw,
+  Leaf,
+  Layers,
 } from 'lucide-react';
-import { Order, DeliveryPartner, SimulationState } from '../../types';
+import { Order, DeliveryPartner, SimulationState, TrafficSegment, TrafficIncident, WeatherTelemetry } from '../../types';
 import { api } from '../../services/api';
 import { LiveDeliveryMap } from '../common/LiveDeliveryMap';
 import { MapMarkerItem } from '../common/LeafletMap';
@@ -40,6 +42,9 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
   const [error, setError] = useState<string | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [routePolyline, setRoutePolyline] = useState<[number, number][]>([]);
+  const [trafficSegments, setTrafficSegments] = useState<TrafficSegment[]>([]);
+  const [incidents, setIncidents] = useState<TrafficIncident[]>([]);
+  const [weatherTelemetry, setWeatherTelemetry] = useState<WeatherTelemetry | undefined>(undefined);
 
   const fetchOrderData = async () => {
     try {
@@ -51,6 +56,20 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
         try {
           const pRes = await api.getPartner(orderRes.order.assignedPartnerId);
           setPartner(pRes.partner);
+
+          try {
+            const routeRes = await api.getOptimizedRoute(orderRes.order.assignedPartnerId);
+            if (routeRes.route) {
+              if (routeRes.route.routePolyline && routeRes.route.routePolyline.length > 1) {
+                setRoutePolyline(routeRes.route.routePolyline);
+              }
+              setTrafficSegments(routeRes.route.trafficSegments || []);
+              setIncidents(routeRes.route.incidents || []);
+              setWeatherTelemetry(routeRes.route.weatherTelemetry);
+            }
+          } catch {
+            // fallback to default corridor below
+          }
         } catch {
           // Ignore
         }
@@ -60,8 +79,8 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
       const simRes = await api.getSimulation();
       setSimulation(simRes.simulation);
 
-      // Calculate or fetch route geometry between rider/warehouse and destination
-      if (orderRes.order) {
+      // Calculate or fetch fallback route geometry between rider/warehouse and destination
+      if (orderRes.order && routePolyline.length === 0) {
         const origin = orderRes.order.warehouseLocation;
         const dest = orderRes.order.deliveryAddress;
         // Construct visual corridor line
@@ -221,8 +240,13 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
               zoom={14}
               markers={mapMarkers}
               polyline={routePolyline}
+              trafficSegments={trafficSegments}
+              incidents={incidents}
+              weatherTelemetry={weatherTelemetry}
+              weatherCondition={weatherTelemetry?.condition || simulation?.weather}
+              trafficCondition={trafficSegments?.some(s => s.status === 'SEVERE') ? 'SEVERE' : trafficSegments?.some(s => s.status === 'HIGH') ? 'HIGH' : 'MEDIUM'}
               vehicleType={partner?.vehicleType === 'electric_van' ? 'electric_van' : partner?.vehicleType === 'motorcycle' ? 'motorcycle' : 'electric_bike'}
-              height="380px"
+              height="390px"
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1 text-[11px] text-slate-500">
@@ -304,6 +328,21 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
                 : 'Dynamic ETA adjusted for current road traffic and weather'}
             </p>
           </div>
+
+          {/* Green Same-Path Co-Delivery Notice */}
+          {order.isBatched && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 shadow-2xs space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+                <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Green Same-Path Co-Delivery</span>
+              </div>
+              <p className="text-xs text-emerald-800 leading-relaxed">
+                Your courier is carrying items for another customer along the{' '}
+                <strong>{order.coDeliveryCorridor || 'same corridor path'}</strong>.
+                Combining nearby stops eliminates duplicate warehouse round-trips and saves ~{order.batchFuelSavingsLiters || 0.38}L of fuel!
+              </p>
+            </div>
+          )}
 
           {/* Secure Delivery OTP Card */}
           {order.status !== 'DELIVERED' && order.otpCode && (

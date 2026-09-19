@@ -102,3 +102,46 @@ export function interpolatePolyline(
     totalKm,
   };
 }
+
+export function calculateDynamicSpeed(
+  baseSpeedKmH: number = 35,
+  trafficCondition: string = 'LOW',
+  weatherCondition: string = 'CLEAR',
+  isNearBottleneck: boolean = false
+): { speedKmH: number; statusText: string; color: string; label: string } {
+  let speed = baseSpeedKmH;
+  let statusText = 'Normal Cruising';
+  let color = '#22c55e';
+  let label = 'Smooth';
+
+  if (trafficCondition === 'SEVERE' || isNearBottleneck) {
+    speed = Math.max(5, Math.round(baseSpeedKmH * 0.22));
+    statusText = 'Severe Congestion (Gridlock)';
+    color = '#b91c1c';
+    label = 'Gridlock';
+  } else if (trafficCondition === 'HIGH') {
+    speed = Math.max(10, Math.round(baseSpeedKmH * 0.45));
+    statusText = 'High Traffic Delay';
+    color = '#ef4444';
+    label = 'Heavy Traffic';
+  } else if (trafficCondition === 'MEDIUM') {
+    speed = Math.round(baseSpeedKmH * 0.72);
+    statusText = 'Moderate Traffic Flow';
+    color = '#f59e0b';
+    label = 'Moderate';
+  }
+
+  // Weather damper
+  if (weatherCondition === 'THUNDERSTORM') {
+    speed = Math.min(speed, 22);
+    statusText += ' • Flash Storm Dampener';
+  } else if (weatherCondition === 'RAIN') {
+    speed = Math.min(speed, 26);
+    statusText += ' • Wet Road Damper (-25%)';
+  } else if (weatherCondition === 'FOG') {
+    speed = Math.min(speed, 24);
+    statusText += ' • Fog Speed Caution';
+  }
+
+  return { speedKmH: Math.max(4, speed), statusText, color, label };
+}
