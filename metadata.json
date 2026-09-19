@@ -1,0 +1,6 @@
+{
+  "name": "SmartAI Logistics",
+  "description": "AI-powered e-commerce and delivery platform with real-time OSRM route optimization, fuel tracking, traffic simulation, and automated dispatch.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
